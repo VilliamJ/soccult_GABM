@@ -1,0 +1,385 @@
+---
+title: "office_analysis"
+output: html_document
+date: "2024-05-21"
+---
+
+## Setup
+```{r setup, include=FALSE}
+pacman::p_load('tidyverse', 'lmerTest')
+```
+
+```{r}
+theme_set(theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+  ))
+```
+
+
+```{r}
+df <- read.csv('/Users/villiamjensen/Documents/Cognitive Science/4. semester/Social/social_GABM/office_closed_v1.csv')
+df1 <- read.csv('/Users/villiamjensen/Documents/Cognitive Science/4. semester/Social/social_GABM/office_closed_v2.csv')
+df2 <- read.csv('/Users/villiamjensen/Documents/Cognitive Science/4. semester/Social/social_GABM/office_open_v1.csv')
+df3 <- read.csv('/Users/villiamjensen/Documents/Cognitive Science/4. semester/Social/social_GABM/office_open_v2.csv')
+df4 <- read.csv('/Users/villiamjensen/Documents/Cognitive Science/4. semester/Social/social_GABM/office_open_v3.csv')
+
+df <- rbind(df, df1, df2, df3, df4)
+```
+
+```{r}
+df$gender <- ifelse(df$Name %in% c("Arnault", "Andreas", "Josh", "Marc", "Max"), 'M', 'F')
+df$End.Salary <- gsub("[^0-9]", "", df$End.Salary)
+
+#df$Start.Salary <- (gsub("[^0-9]", "", df$Start.Salary)
+
+#df$gender <- as.factor(df$gender)
+df$Start.Salary <- as.numeric(df$Start.Salary)
+df$End.Salary <- as.numeric(df$End.Salary)
+```
+
+
+```{r}
+df <- df %>% 
+  rename(start= Start.Salary,
+         end = End.Salary,
+         edu = Education,
+         rsp = Responsibility,
+         eff = Effort,
+         mean_other = Average.Other.Salary)
+```
+
+```{r}
+df$ID <- rep(1:length(df$Name))
+```
+
+
+# Preprocessing
+```{r}
+df %>% filter(end > 300000) %>% 
+  summarize(end, ID)
+
+df$end <- ifelse(df$ID == 3921, 60000, df$end)
+```
+
+
+```{r}
+df$end <- ifelse(df$end < 100, df$end * 1000, df$end) # for mistakes where $65,000 becomes $65
+df$end <- ifelse(df$end > 300000, df$end/100, df$end) #for mistakes where $65,000.00 becomes $6,500,000
+```
+
+```{r}
+df$raise <- df$end- df$start
+```
+
+
+```{r}
+df <- df %>%
+  mutate(edu = case_when(
+    edu == "a Bachelor's degree" ~ 2,
+    edu == "a Master's degree" ~ 3,
+    edu == "a PhD" ~ 4,
+    edu == "high school" ~ 1,
+    TRUE ~ NA_real_  # In case there's an unexpected value, set it to NA
+  ))
+
+df$edu <- as.factor(df$edu)
+```
+
+
+
+```{r}
+df %>% group_by(edu) %>% 
+  summarize(mean(end), mean(raise))
+```
+
+
+```{r}
+df %>% filter(edu == "a Bachelor's degree") %>% 
+  summarize(raise, ID) %>% arrange(desc(raise))
+```
+
+
+# Statistical Tests
+
+
+```{r}
+summary(lmerTest::lmer(raise ~ Condition + (1 | edu), data = df))
+```
+
+
+
+```{r}
+summary(lmerTest::lmer(end ~ Condition + (1 | edu), data = df))
+```
+
+
+```{r}
+summary(lmerTest::lmer(end ~ edu + (1 | Condition), data = df))
+```
+
+
+
+
+
+# Visualizations
+
+```{r}
+df %>% 
+  ggplot() +
+  geom_density(aes(x = raise)) +
+  facet_wrap(~ Condition) + 
+    scale_x_continuous(labels = scales::comma) +
+   theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+   ) +
+  labs(x = 'Difference of Salary Post-Negotiation')
+
+  
+```
+
+```{r}
+df %>%
+  ggplot() +
+  geom_density(aes(x = start, color = 'Start'), size = 0.8) +  # Increase the size for thicker lines
+  geom_density(aes(x = end, color = 'End'), size = 0.8) +      # Increase the size for thicker lines
+  scale_color_manual(values = c('Start' = '#E25349', 'End' = '#436B5C')) +
+  scale_x_continuous(labels = scales::comma) +
+  theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+  ) +
+  labs(
+    x = 'Distribution of Salaries Pre- and Post-Negotiation',
+    color = 'Legend'
+  ) +
+  facet_wrap(~ Condition)
+```
+
+
+```{r}
+df %>%
+  ggplot() +
+  geom_density(aes(x = start), col = '#E25349') +
+  geom_density(aes(x = end), col = '#436B5C') +
+  scale_x_continuous(labels = scales::comma) +
+   theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+  ) +
+  labs(x = 'Distribution of Salaries Pre- and Post-Negotation') +
+  facet_wrap(~ Condition)
+```
+```{r}
+df %>%
+  ggplot() +
+  geom_density(aes(x = start), col = '#E25349') +
+  geom_density(aes(x = end), col = '#436B5C') +
+  scale_x_continuous(labels = scales::comma) +
+   theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+  ) +
+  facet_wrap(~ Condition)
+```
+```{r}
+pairs <- c('#E25349', '#436B5C')
+```
+
+```{r}
+# df %>%
+#   ggplot() +  geom_density(aes(x = reality, col = Condition)) +
+#   scale_x_continuous(labels = scales::comma) +
+#    theme(
+#     panel.background = element_rect(fill = 'white'), # change the plot background
+#     plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+#   ) +
+# scale_color_manual(values = pairs)
+```
+
+
+
+
+```{r}
+df %>%
+  ggplot() +
+  geom_density(aes(x = start), col = '#E25349') +
+  geom_density(aes(x = end), col = '#436B5C') +
+  scale_x_continuous(labels = scales::comma) +
+   theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+  ) +
+  facet_wrap(edu ~ Condition, nrow = 4)
+```
+
+
+
+
+
+
+
+```{r}
+df_filter <- df %>% filter(raise > -50000)
+df_filter <- na.omit(df_filter)
+df_filter <- df_filter[complete.cases(df_filter), ]
+```
+
+
+
+```{r}
+df_filter %>% 
+  ggplot(aes(x = start, 
+             y = raise, 
+             col = edu)) +
+  geom_point() + 
+  #geom_smooth(aes(group = 1), 
+              #method = 'lm', 
+              #color = '#353839') +
+  geom_smooth(
+    method = 'lm'
+  ) + 
+  scale_color_manual(values = c('#BF9550', 
+                                '#436B5C', 
+                                '#E6B5A6', 
+                                '#E25349'),
+                     labels = c('High School', 
+                                "Bachelor's Degree", 
+                                "Master's Degree", 
+                                'PhD')) +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+     theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+  ) +
+  labs(x = 'Start Salary', y = 'Salary Change', color = 'Education Level') +
+  ggtitle('Salary Change Post-Negotiation by Start Salary') +
+  facet_wrap(~ Condition)
+```
+
+```{r}
+
+df_yolo <- subset(df, select = c(start,end,edu))
+df_yolo <- reshape2::melt(df_yolo, id.vars = 'edu', variable.name = 'salary_type', value.name = 'salary')
+
+```
+
+```{r}
+summary(lmerTest::lmer(end ~ gender * Condition + (1 | edu), data = df))
+```
+
+```{r}
+summary(lm(salary ~ gender * salary_type, data = df_yolo_gender_condition))
+```
+```{r}
+df$overpaid <- ifelse(df$start > df$Expected.Salary, 1, 0)
+df$overpaid <- as.factor(df$overpaid)
+```
+
+```{r}
+print(pairs)
+```
+
+```{r}
+df %>% 
+  ggplot() +
+  geom_density(aes(x = start), col = 'black') +
+  labs(x = 'Pre-Negotiation Salary')
+```
+
+```{r}
+df %>% 
+  ggplot() +
+  geom_density(aes(x = start), col ="#E25349") +
+  geom_density(aes(x = end), col = "#436B5C") +
+  facet_wrap(~ overpaid)
+```
+
+
+
+```{r}
+
+# Function to calculate the standard error
+std_error <- function(x) {
+  sd(x) / sqrt(length(x))
+}
+
+# Grouping by 'salary_type' and 'edu', then calculating the mean salary and standard error
+df_grouped <- df_yolo %>% 
+  group_by(salary_type, edu) %>% 
+  summarize(mean_salary = mean(salary, na.rm = TRUE),
+            se_salary = std_error(salary))
+
+# Plotting the data with standard error bars
+ggplot(df_grouped, aes(x = edu, y = mean_salary, color = salary_type, group = salary_type)) +
+  #geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_salary - se_salary, ymax = mean_salary + se_salary), width = 0.2) +
+  labs(title = "Mean Salary by Education Level", 
+       x = "Education Level", 
+       y = "Mean Salary") +
+scale_color_manual(values = c("start" = '#E25349', "end" ='#436B5C'), 
+                    name = "Salary Type", 
+                    labels = c("Start Salary", "End Salary")) +
+     theme(
+    panel.background = element_rect(fill = 'white'), # change the plot background
+    plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+   ) 
+```
+```{r}
+# Subset the relevant columns including gender and Condition
+df_yolo_gender_condition <- subset(df, select = c(start, end, gender, Condition))
+df_yolo_gender_condition <- reshape2::melt(df_yolo_gender_condition, id.vars = c('gender', 'Condition'), variable.name = 'salary_type', value.name = 'salary')
+
+# Function to calculate the standard error (already defined previously)
+# std_error <- function(x) {
+#  sd(x) / sqrt(length(x))
+# }
+
+# Grouping by 'salary_type', 'gender', and 'Condition', then calculating the mean salary and standard error
+df_grouped_gender_condition <- df_yolo_gender_condition %>% 
+  group_by(salary_type, gender, Condition) %>% 
+  summarize(mean_salary = mean(salary, na.rm = TRUE),
+            se_salary = std_error(salary))
+
+# Plotting the data with standard error bars
+ggplot(df_grouped_gender_condition, aes(x = gender, y = mean_salary, color = salary_type, group = salary_type)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_salary - se_salary, ymax = mean_salary + se_salary), width = 0.2) +
+  facet_wrap(~Condition) +
+  labs(title = "Mean Salary by Gender and Condition", 
+       x = "Gender", 
+       y = "Mean Salary") +
+  scale_color_manual(values = c("start" = '#E25349', "end" = '#436B5C'), 
+                     name = "Salary Type", 
+                     labels = c("Start Salary", "End Salary")) +
+  theme(
+    panel.background = element_rect(fill = 'white'), 
+    plot.background = element_rect(fill = "#E8E2DB")
+  )
+
+```
+
+
+
+
+```{r}
+# ggplot(df_yolo, aes(x = edu, y = salary, fill = salary_type)) +
+#   geom_bar(stat = 'identity', position = position_dodge(width = 0.9)) +
+#   labs(title = 'Start and End Salaries by Education Level',
+#        x = 'Education Level',
+#        y = 'Salary') +
+#   scale_fill_manual(values = c("start" = '#436B5C', "end" = '#E25349'), 
+#                     name = "Salary Type", 
+#                     labels = c("Start Salary", "End Salary")) +
+#    theme(
+#     panel.background = element_rect(fill = 'white'), # change the plot background
+#     plot.background = element_rect(fill = "#E8E2DB") # change the entire plot background
+#    ) 
+```
+
+
+
+
